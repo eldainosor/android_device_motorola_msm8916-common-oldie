@@ -83,13 +83,81 @@ on fs
     mount_all fstab.qcom
 
     # set up a symbolic link so the many references to the old location still work and the java code can remain platform agnostic.
-    symlink /dev/block/bootdevice /dev/block/platform/msm_sdcc.1
+    symlink /dev/block/bootdevice /dev/block/platform/soc.0/7824900.sdhci
 
     # use /persist as phony PDS partition
     symlink /persist /pds
 
     mkdir /persist/data 0700  system system
     restorecon_recursive /persist
+
+    chmod 0664 /sys/devices/soc.0/7824900.sdhci/polling
+
+    # Chown polling nodes as needed from UI running on system server
+    chown system system /sys/devices/soc.0/7824900.sdhci/polling
+
+    # Wifi
+    restorecon /data/hostapd
+    restorecon /data/misc/wifi/hostapd/wlan0
+    chown wifi wifi /sys/module/wlan/parameters/fwpath
+
+    #Create directory from IMS services
+    mkdir /data/shared 0755
+    chown system system /data/shared
+
+    #Create directory for FOTA
+    mkdir /data/fota 0771
+    chown system system /data/fota
+
+    #Create directory for hostapd
+    mkdir /data/hostapd 0770 system wifi
+
+    # Create /data/time folder for time-services
+    mkdir /data/time/ 0700 system system
+
+    mkdir /data/audio/ 0770 media audio
+    # Enable the setgid bit on the directory
+    chmod 2770 /data/audio
+
+    setprop vold.post_fs_data_done 1
+
+    # Create a folder for SRS to be able to create a usercfg file
+    mkdir /data/data/media 0770 media media
+
+    # Setup folders for diag_mdlog
+    mkdir /data/diag_mdlog 0750 system log
+    mkdir /data/diag_mdlog/logs 0750 log log
+
+    # Setup folder for native to transfer data to NativeDropBoxAgent
+    mkdir /data/system/dropbox-add 0730 system qcom_diag
+
+    #Subsystem RAM-dumps
+    mkdir /data/ss-ram-dumps 0750 radio log
+    mkdir /data/ss-ram-dumps/bp-dumps 0750 radio log
+
+    # Create directory for cutback
+    mkdir /data/misc/cutback 0770 radio wifi
+
+    # To remove apanic proc entry
+    write /proc/apanic_console 1
+
+    # Create directory used by power_supply_logger
+    mkdir /data/power_supply_logger 0750 mot_pwric log
+
+    # create the necessary data dirs for tpapi with proper permission
+    mkdir /dev/tpapi 02770 mot_tpapi mot_tpapi
+    mkdir /data/tpapi 02770 mot_tpapi mot_tpapi
+    mkdir /data/tpapi/etc 02770 mot_tpapi mot_tpapi
+    mkdir /data/tpapi/etc/tpa 02770 mot_tpapi mot_tpapi
+    mkdir /data/tpapi/etc/tpa/persistent 02770 mot_tpapi mot_tpapi
+
+    # Permissions for battery health daemon
+    chown mot_pwric mot_pwric /sys/module/qpnp_bms/parameters/last_ocv_uv
+    chown mot_pwric mot_pwric /sys/module/qpnp_charger/parameters/bms_chrg_capacity
+    chown mot_pwric mot_pwric /sys/module/qpnp_charger/parameters/bms_chrg_capacity_temp
+    chown mot_pwric mot_pwric /sys/module/qpnp_charger/parameters/chrg_timestamp
+
+    start batt_health
 
 on early-boot
     # set RLIMIT_MEMLOCK to 64MB
@@ -362,16 +430,10 @@ on post-fs-data
     # We chown/chmod /persist again so because mount is run as root + defaults
     chown system system /persist
     chmod 0771 /persist
-    chmod 0664 /sys/devices/platform/msm_sdcc.1/polling
-    chmod 0664 /sys/devices/platform/msm_sdcc.2/polling
-    chmod 0664 /sys/devices/platform/msm_sdcc.3/polling
-    chmod 0664 /sys/devices/platform/msm_sdcc.4/polling
+    chmod 0664 /sys/devices/soc.0/7824900.sdhci/polling
 
     # Chown polling nodes as needed from UI running on system server
-    chown system system /sys/devices/platform/msm_sdcc.1/polling
-    chown system system /sys/devices/platform/msm_sdcc.2/polling
-    chown system system /sys/devices/platform/msm_sdcc.3/polling
-    chown system system /sys/devices/platform/msm_sdcc.4/polling
+    chown system system /sys/devices/soc.0/7824900.sdhci/polling
 
     #Create the symlink to qcn wpa_supplicant folder for ar6000 wpa_supplicant
     mkdir /data/system 0775 system system
@@ -641,33 +703,11 @@ service hciattach /system/bin/sh /system/etc/init.qcom.bt.sh
     disabled
     oneshot
 
-on property:bluetooth.hciattach=true
-    start hciattach
-
-on property:bluetooth.hciattach=false
-    setprop bluetooth.status off
-
-# QMUX must be in multiple groups to support external process connections
-service qmuxd /system/bin/qmuxd
-    class main
-    user root
-    group radio audio bluetooth gps qcom_diag
-
-service netmgrd /system/bin/netmgrd
-    class main
-
-on property:ro.use_data_netmgrd=false
-    # netmgr not supported on specific target
-    stop netmgrd
-
-# Adjust socket buffer to enlarge TCP receive window for high bandwidth
-# but only if ro.data.large_tcp_window_size property is set.
-on property:ro.data.large_tcp_window_size=true
-    write /proc/sys/net/ipv4/tcp_adv_win_scale  2
-
-service p2p_supplicant /system/bin/wpa_supplicant \
-    -ip2p0 -Dnl80211 -c/data/misc/wifi/p2p_supplicant.conf -N \
-    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf -d \
+# WPA
+service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
+    -ip2p0 -Dnl80211 -c/data/misc/wifi/p2p_supplicant.conf \
+    -I/system/etc/wifi/p2p_supplicant_overlay.conf -N \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
     -I/system/etc/wifi/wpa_supplicant_overlay.conf \
     -e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0 -puse_p2p_group_interface=1
     #   we will start as root and wpa_supplicant will switch to user wifi
@@ -678,89 +718,6 @@ service p2p_supplicant /system/bin/wpa_supplicant \
     socket wpa_wlan0 dgram 660 wifi wifi
     disabled
     oneshot
-
-service wpa_supplicant /system/bin/wpa_supplicant \
-    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf -d \
-    -I/system/etc/wifi/wpa_supplicant_overlay.conf \
-    -e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0
-    #   we will start as root and wpa_supplicant will switch to user wifi
-    #   after setting up the capabilities required for WEXT
-    #   user wifi
-    #   group wifi inet keystore
-    class main
-    socket wpa_wlan0 dgram 660 wifi wifi
-    disabled
-    oneshot
-
-service hostapd /system/bin/hostapd -dd /data/hostapd/hostapd.conf
-    class late_start
-    user root
-    group root
-    oneshot
-    disabled
-
-service ril-daemon /system/bin/rild
-    class main
-    socket rild stream 660 root radio
-    socket rild-debug stream 660 radio system
-    socket cutback stream 660 media radio
-    user root
-    group radio cache inet misc audio sdcard_rw sensors qcom_diag log net_raw diag
-
-service ril-daemon2 /system/bin/rild -c 2
-    class main
-    socket rild2 stream 660 root radio
-    socket rild-debug2 stream 660 radio system
-    user root
-    disabled
-    group radio cache inet misc audio sdcard_rw sensors qcom_diag log net_raw diag
-
-service rild2-wrapper /system/bin/sh /system/etc/init.qcom.ril.sh
-    class late_start
-    user root
-    group root
-    oneshot
-
-on property:sys.wifi.tethering=true
-    write /sys/class/net/wlan0/queues/rx-0/rps_cpus ${sys.usb.rps_mask}
-    write /sys/class/net/wlan0/queues/rx-1/rps_cpus ${sys.usb.rps_mask}
-    write /sys/class/net/wlan0/queues/rx-2/rps_cpus ${sys.usb.rps_mask}
-    write /sys/class/net/wlan0/queues/rx-3/rps_cpus ${sys.usb.rps_mask}
-
-service ims_rtp_daemon /system/bin/ims_rtp_daemon
-   class main
-   user system
-   socket ims_rtpd stream 0660 system radio
-   group radio diag diag inet log
-   disabled
-
-on property:sys.ims.DATA_DAEMON_STATUS=1
-    start ims_rtp_daemon
-
-service imscmservice /system/bin/imscmservice
-      class main
-      user system
-    group radio diag diag log
-    disabled
-
-on property:sys.ims.DATA_DAEMON_STATUS=1
-    start imscmservice
-
-service imsdatadaemon /system/bin/imsdatadaemon
-    class main
-    user system
-    socket ims_datad stream 0660 system radio
-    group system wifi radio inet log diag
-    disabled
-
-on property:sys.ims.QMI_DAEMON_STATUS=1
-    start imsdatadaemon
-
-service imsqmidaemon /system/bin/imsqmidaemon
-    class main
-    user system
-    socket ims_qmid stream 0660 system radio
-    group radio log diag
 
 on charger
     trigger early-fs
