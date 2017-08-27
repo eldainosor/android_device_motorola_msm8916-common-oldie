@@ -47,7 +47,7 @@ TARGET_KERNEL_ARCH := arm
 TARGET_KERNEL_SOURCE := kernel/motorola/msm8916
 TARGET_SPECIFIC_HEADER_PATH := $(COMMON_PATH)/include
 TARGET_SYSTEM_PROP := $(COMMON_PATH)/system.prop
->>>>>>> cfdc4c4... msm8610-common: Oreo bringup
+
 # Audio
 BOARD_USES_ALSA_AUDIO := true
 USE_CUSTOM_AUDIO_POLICY := 0
