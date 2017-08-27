@@ -24,7 +24,6 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.hardware.audio.low_latency.xml:system/etc/permissions/android.hardware.audio.low_latency.xml \
     frameworks/native/data/etc/android.hardware.bluetooth.xml:system/etc/permissions/android.hardware.bluetooth.xml \
     frameworks/native/data/etc/android.hardware.bluetooth_le.xml:system/etc/permissions/android.hardware.bluetooth_le.xml \
-    frameworks/native/data/etc/android.hardware.camera.flash-autofocus.xml:system/etc/permissions/android.hardware.camera.flash-autofocus.xml \
     frameworks/native/data/etc/android.hardware.camera.front.xml:system/etc/permissions/android.hardware.camera.front.xml \
     frameworks/native/data/etc/android.hardware.location.gps.xml:system/etc/permissions/android.hardware.location.gps.xml \
     frameworks/native/data/etc/android.hardware.wifi.xml:system/etc/permissions/android.hardware.wifi.xml \
@@ -74,15 +73,14 @@ PRODUCT_COPY_FILES +=  \
     $(LOCAL_PATH)/audio/audio_effects.conf:system/vendor/etc/audio_effects.conf \
     $(LOCAL_PATH)/audio/audio_policy.conf:system/etc/audio_policy.conf
 
-# Browser
+# Bluetooth HAL
 PRODUCT_PACKAGES += \
-    Gello
+    android.hardware.bluetooth@1.0-impl \
+    libbt-vendor
 
-# Camera
-PRODUCT_PACKAGES += \
-    camera.msm8916 \
-    libbson \
-    Snap
+# Boot animation
+TARGET_SCREEN_HEIGHT := 1280
+TARGET_SCREEN_WIDTH := 720
 
 # CMActions
 PRODUCT_PACKAGES += \
@@ -101,14 +99,28 @@ PRODUCT_PACKAGES += \
     ethertypes \
     libebtc
 
+# Firmware Extraction
+ifeq ($(filter surnia,$(TARGET_DEVICE)),)
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/configs/extract_firmware.sh:install/bin/extract_firmware.sh
+endif
+
 # FM
 PRODUCT_PACKAGES += \
     FMRadio \
     libfmjni
 
+# For android_filesystem_config.h
+PRODUCT_PACKAGES += \
+    fs_config_files
+
 # GPS
 PRODUCT_PACKAGES += \
     gps.msm8916
+
+# IMS
+PRODUCT_PACKAGES += \
+    libshims_ims
 
 # IRSC
 PRODUCT_COPY_FILES += \
@@ -164,10 +176,6 @@ PRODUCT_PACKAGES += \
     librmnetctl \
     libxml2
 
-# Stlport
-PRODUCT_PACKAGES += \
-    libstlport
-
 # Thermal
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/thermal-engine.conf:system/etc/thermal-engine.conf
@@ -193,9 +201,23 @@ PRODUCT_PACKAGES += \
     tcpdump \
     wcnss_service
 
-PRODUCT_COPY_FILES += \
-    kernel/motorola/msm8916/drivers/staging/prima/firmware_bin/WCNSS_cfg.dat:system/etc/firmware/wlan/prima/WCNSS_cfg.dat \
-    kernel/motorola/msm8916/drivers/staging/prima/firmware_bin/WCNSS_qcom_cfg.ini:system/etc/firmware/wlan/prima/WCNSS_qcom_cfg.ini
+# Wifi
+PRODUCT_PACKAGES += \
+    android.hardware.wifi@1.0-service \
+    hostapd_default.conf \
+    hostapd.accept \
+    hostapd.deny \
+    hostapd \
+    wpa_supplicant \
+    wpa_supplicant_overlay.conf \
+    p2p_supplicant_overlay.conf \
+    wpa_supplicant.conf \
+    wlan_module_symlink \
+    wlan_persist_symlink \
+    wcnss_service \
+    libQWiFiSoftApCfg \
+    libqsap_sdk \
+    wificond
 
 PRODUCT_BUILD_PROP_OVERRIDES += BUILD_UTC_DATE=0
 
